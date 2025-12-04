@@ -48,9 +48,9 @@ export const normalizeNode: WithEditorFirstArg<Editor['normalizeNode']> = (
   // - Elements that begin with a text child or an inline element child should have only inline children.
   // - All other elements should have only block children.
   const shouldHaveInlines =
-    !(element === editor) &&
+    element !== editor &&
     (editor.isInline(element) ||
-      Text.isText(element.children[0]) ||
+      Text.isTextNode(element.children[0]) ||
       editor.isInline(element.children[0]))
 
   if (shouldHaveInlines) {
@@ -59,8 +59,8 @@ export const normalizeNode: WithEditorFirstArg<Editor['normalizeNode']> = (
       const child = element.children[n]
       const prev = element.children[n - 1] as Descendant | undefined
 
-      if (Text.isText(child)) {
-        if (prev != null && Text.isText(prev)) {
+      if (Text.isTextNode(child)) {
+        if (prev != null && Text.isTextNode(prev)) {
           // Merge adjacent text nodes that are empty or match.
           if (child.text === '') {
             Transforms.removeNodes(editor, {
@@ -85,7 +85,7 @@ export const normalizeNode: WithEditorFirstArg<Editor['normalizeNode']> = (
       } else {
         if (editor.isInline(child)) {
           // Ensure that inline nodes are surrounded by text nodes.
-          if (prev == null || !Text.isText(prev)) {
+          if (prev == null || !Text.isTextNode(prev)) {
             const newChild = { text: '' }
             Transforms.insertNodes(editor, newChild, {
               at: path.concat(n),
@@ -118,7 +118,7 @@ export const normalizeNode: WithEditorFirstArg<Editor['normalizeNode']> = (
       const child = element.children[n]
 
       // Allow only block nodes in the top-level children and parent blocks that only contain block nodes
-      if (Text.isText(child) || editor.isInline(child)) {
+      if (Text.isTextNode(child) || editor.isInline(child)) {
         if (options?.fallbackElement) {
           Transforms.wrapNodes(editor, options.fallbackElement(), {
             at: path.concat(n),

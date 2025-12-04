@@ -21,6 +21,12 @@ export const replaceChildren = <T>(
   ...newValues: T[]
 ) => [...xs.slice(0, index), ...newValues, ...xs.slice(index + removeCount)]
 
+export const replaceChild = <T>(xs: T[], index: number, newValue: T) => {
+  const out = xs.slice()
+  out[index] = newValue
+  return out
+}
+
 export const removeChildren = replaceChildren
 
 /**
@@ -45,12 +51,12 @@ export const modifyDescendant = <N extends Descendant>(
 
     modifiedNode = {
       ...ancestorNode,
-      children: replaceChildren(ancestorNode.children, index, 1, modifiedNode),
+      children: replaceChild(ancestorNode.children, index, modifiedNode),
     }
   }
 
   const index = slicedPath.pop()!
-  root.children = replaceChildren(root.children, index, 1, modifiedNode)
+  root.children = replaceChild(root.children, index, modifiedNode)
 }
 
 /**
