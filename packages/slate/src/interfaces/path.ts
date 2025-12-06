@@ -375,7 +375,9 @@ export const Path: PathInterface = {
       )
     }
 
-    return path.slice(0, -1).concat(last - 1)
+    const out = path.slice()
+    out[out.length - 1] = last - 1
+    return out
   },
 
   relative(path: Path, ancestor: Path): Path {
