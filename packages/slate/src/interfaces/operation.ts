@@ -123,6 +123,13 @@ export type NodeOperation =
   | SetNodeOperation
   | SplitNodeOperation
 
+export type PathTransformingOperation =
+  | InsertNodeOperation
+  | MergeNodeOperation
+  | MoveNodeOperation
+  | RemoveNodeOperation
+  | SplitNodeOperation
+
 export type SelectionOperation = SetSelectionOperation
 
 export type TextOperation = InsertTextOperation | RemoveTextOperation

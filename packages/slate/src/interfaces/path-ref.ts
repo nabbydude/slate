@@ -24,7 +24,7 @@ export const PathRef: PathRefInterface = {
   transform(ref: PathRef, op: Operation): void {
     const { current, affinity } = ref
 
-    if (current == null) {
+    if (current == null || !Path.operationCanTransformPath(op)) {
       return
     }
 

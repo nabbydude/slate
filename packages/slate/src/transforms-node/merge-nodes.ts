@@ -80,18 +80,15 @@ export const mergeNodes: NodeTransforms['mergeNodes'] = (
     }
 
     const newPath = Path.next(prevPath)
-    const commonPath = Path.common(path, prevPath)
+    const commonDepth = Path.commonDepth(path, prevPath)
     const isPreviousSibling = Path.isSibling(path, prevPath)
-    const levels = Array.from(Editor.levels(editor, { at: path }), ([n]) => n)
-      .slice(commonPath.length)
-      .slice(0, -1)
 
     // Determine if the merge will leave an ancestor of the path empty as a
     // result, in which case we'll want to remove it after merging.
     const emptyAncestor = Editor.above(editor, {
       at: path,
       mode: 'highest',
-      match: n => levels.includes(n) && hasSingleChildNest(editor, n),
+      match: (n, p) => p.length >= commonDepth && hasSingleChildNest(editor, n),
     })
 
     const emptyRef = emptyAncestor && Editor.pathRef(editor, emptyAncestor[1])
