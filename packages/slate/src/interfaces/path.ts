@@ -348,16 +348,14 @@ export const Path: PathInterface = {
       )
     }
 
-    const last = path[path.length - 1]
-
-    if (last <= 0) {
+    if (!Path.hasPrevious(path)) {
       throw new Error(
         `Cannot get the previous path of a first child path [${path}] because it would result in a negative index.`
       )
     }
 
     const out = path.slice()
-    out[path.length - 1] = last
+    out[out.length - 1] -= 1
     return out
   },
 
