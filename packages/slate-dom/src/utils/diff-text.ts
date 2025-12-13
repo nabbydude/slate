@@ -413,6 +413,7 @@ export function transformTextDiff(
     }
   }
 
+  if (!Path.operationCanTransformPath(op)) return textDiff
   const newPath = Path.transform(path, op)
   if (!newPath) {
     return null
