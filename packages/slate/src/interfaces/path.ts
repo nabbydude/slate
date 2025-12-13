@@ -295,9 +295,10 @@ export const Path: PathInterface = {
     const { reverse = false } = options
     const list: Path[] = []
 
-    for (let i = 0; i <= path.length; i++) {
+    for (let i = 0; i < path.length; i++) {
       list.push(path.slice(0, i))
     }
+    list.push(path)
 
     if (reverse) {
       list.reverse()
