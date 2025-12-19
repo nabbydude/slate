@@ -29,6 +29,8 @@ export interface PathTransformOptions {
   affinity?: TextDirection | null
 }
 
+export const EMPTY_PATH = [] as [] satisfies Path
+
 export interface PathInterface {
   /**
    * Get a list of ancestor paths for a given path.
@@ -182,13 +184,23 @@ export interface PathInterface {
 export const Path: PathInterface = {
   ancestors(path: Path, options: PathAncestorsOptions = {}): Path[] {
     if (path.length === 0) return [] // root has no ancestors, empty array
-    return Path.levels(Path.parent(path), options)
+    const { reverse = false } = options
+    const paths = Path.levels(path, options)
+
+    if (reverse) {
+      paths.unshift()
+    } else {
+      paths.pop()
+    }
+
+    return paths
   },
 
   common(path: Path, another: Path): Path {
+    const min = Math.min(path.length, another.length)
     const common: Path = []
 
-    for (let i = 0; i < path.length && i < another.length; i++) {
+    for (let i = 0; i < min; i++) {
       const av = path[i]
       const bv = another[i]
 
@@ -293,9 +305,11 @@ export const Path: PathInterface = {
 
   levels(path: Path, options: PathLevelsOptions = {}): Path[] {
     const { reverse = false } = options
-    const list: Path[] = []
+    const list: Path[] = [EMPTY_PATH]
 
-    for (let i = 0; i < path.length; i++) {
+    if (path.length === 0) return list
+
+    for (let i = 1; i < path.length; i++) {
       list.push(path.slice(0, i))
     }
     list.push(path)
@@ -403,6 +417,8 @@ export const Path: PathInterface = {
       case 'insert_node': {
         if (opEqOrAbovePath || opEndsBeforePath) {
           outPath[opDepth] += 1
+        } else {
+          return path
         }
 
         break
@@ -413,6 +429,8 @@ export const Path: PathInterface = {
           return null
         } else if (opEndsBeforePath) {
           outPath[opDepth] -= 1
+        } else {
+          return path
         }
 
         break
@@ -421,11 +439,11 @@ export const Path: PathInterface = {
       case 'merge_node': {
         const { position } = operation
 
-        if (opEqOrAbovePath || opEndsBeforePath) {
+        if (opEqualPath || opEndsBeforePath) {
           outPath[opDepth] -= 1
-          outPath[op.length] += position
         } else if (opEqOrAbovePath) {
           outPath[opDepth] -= 1
+          outPath[op.length] += position
         } else {
           return path
         }
@@ -464,10 +482,12 @@ export const Path: PathInterface = {
         const { newPath: newOp } = operation
 
         if (opEqOrAbovePath) {
+          // we are at or inside the node being moved
+
           const cdBetween = Path.commonDepth(op, newOp)
 
           // If the old and new path are the same, it's a no-op.
-          // (this is also the path if new is a descendant of old, which is an invalid operation.)
+          // (this is also the path if the new path is a descendant of the old path, which is an invalid operation since a node cannot be inside itself)
           if (cdBetween === newOp.length) {
             return path
           }
@@ -478,7 +498,7 @@ export const Path: PathInterface = {
           const opEndsBeforeNewOp =
             cdBetween === opDepth && op[cdBetween] < newOp[cdBetween]
           if (opEndsBeforeNewOp && op.length < newOp.length) {
-            // the new path is inside a later sibling of the node that will be removed and where newPath points to will change, adjust to compensate.
+            // the new path is affected by the removal of the old node, adjust to compensate
             outPath[opDepth] -= 1
           }
           return outPath
@@ -492,16 +512,24 @@ export const Path: PathInterface = {
         const newOpEndsBeforePath =
           newCd === newOpDepth && newOp[newCd] < path[newCd]
 
-        if (newOpEqOrAbovePath || newOpEndsBeforePath) {
-          if (opEndsBeforePath) {
-            if (opDepth === newOpDepth) return path // both ops affect path on the same depth and cancel each other out, path is unchanged
+        if (opEndsBeforePath) {
+          if (newOpEndsBeforePath && opDepth === newOpDepth) {
+            return path // affected by both insertion and removal at same depth, they cancel eachother out
+          } else if (
+            (newOpEqOrAbovePath || newOpEndsBeforePath) &&
+            opDepth !== newOpDepth
+          ) {
+            // affected by both insertion and removal at different depths
             outPath[opDepth] -= 1
+            outPath[newOpDepth] += 1
+          } else {
+            outPath[opDepth] -= 1 // only affected by removal at old path
+            // note: this is also true if newOpEqOrAbovePath on a sibling move, since the path will be shifted backward by the removal, then the insertion will happen just ahead of it, which wont affect it.
           }
-          outPath[newOpDepth] += 1
-        } else if (opEndsBeforePath) {
-          outPath[opDepth] -= 1
+        } else if (newOpEqOrAbovePath || newOpEndsBeforePath) {
+          outPath[newOpDepth] += 1 // only affected by insertion at new path
         } else {
-          return path
+          return path // totally unaffected
         }
 
         break
