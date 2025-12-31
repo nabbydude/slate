@@ -14,12 +14,12 @@ import {
 } from '../../index'
 import { MUTATED_CHILD_ARRAYS_IN_BATCH } from '../../utils'
 import {
-  insertChildren,
   modifyChildren,
   modifyDescendant,
   modifyLeaf,
-  removeChildren,
-  replaceChildren,
+  smartInsertChildren,
+  smartRemoveChildren,
+  smartReplaceChildren,
 } from '../../utils/modify'
 
 export interface GeneralTransforms {
@@ -46,8 +46,8 @@ export const GeneralTransforms: GeneralTransforms = {
               `Cannot apply an "insert_node" operation at path [${path}] because the destination is past the end of the node.`
             )
           }
-
-          return insertChildren(children, index, node)
+          const modifiedChildArrays = MUTATED_CHILD_ARRAYS_IN_BATCH.get(editor)
+          return smartInsertChildren(modifiedChildArrays, children, index, node)
         })
 
         transformSelection = true
@@ -74,14 +74,20 @@ export const GeneralTransforms: GeneralTransforms = {
 
       case 'merge_node': {
         const { path } = op
+        if (!Path.hasPrevious(path)) {
+          throw new Error(
+            `Cannot apply a "merge_node" operation at path [${path}] because it has no previous sibling.`
+          )
+        }
         const index = path[path.length - 1]
-        const prevPath = Path.previous(path)
-        const prevIndex = prevPath[prevPath.length - 1]
+        const prevIndex = index - 1
 
         modifyChildren(editor, Path.parent(path), children => {
           const node = children[index]
           const prev = children[prevIndex]
           let newNode: Descendant
+
+          const modifiedChildArrays = MUTATED_CHILD_ARRAYS_IN_BATCH.get(editor)
 
           if (Text.isTextNode(node) && Text.isTextNode(prev)) {
             newNode = { ...prev, text: prev.text + node.text }
@@ -89,6 +95,19 @@ export const GeneralTransforms: GeneralTransforms = {
             Element.isElementNode(node) &&
             Element.isElementNode(prev)
           ) {
+            if (modifiedChildArrays?.has(prev.children)) {
+              // modify child array in place
+              prev.children.push(...node.children)
+              // we can infer that children is mutable because its an ancestor of prev.children. Just mutate in place
+              children.splice(index, 1)
+              return children
+            } else {
+              newNode = {
+                ...prev,
+                children: prev.children.concat(node.children),
+              }
+              modifiedChildArrays?.add(newNode.children)
+            }
             newNode = { ...prev, children: prev.children.concat(node.children) }
           } else {
             throw new Error(
@@ -98,7 +117,13 @@ export const GeneralTransforms: GeneralTransforms = {
             )
           }
 
-          return replaceChildren(children, prevIndex, 2, newNode)
+          return smartReplaceChildren(
+            modifiedChildArrays,
+            children,
+            prevIndex,
+            2,
+            newNode
+          )
         })
 
         transformSelection = true
@@ -116,9 +141,10 @@ export const GeneralTransforms: GeneralTransforms = {
         }
 
         const node = Node.get(editor, path)
+        const modifiedChildArrays = MUTATED_CHILD_ARRAYS_IN_BATCH.get(editor)
 
         modifyChildren(editor, Path.parent(path), children =>
-          removeChildren(children, index, 1)
+          smartRemoveChildren(modifiedChildArrays, children, index, 1)
         )
 
         // This is tricky, but since the `path` and `newPath` both refer to
@@ -131,7 +157,7 @@ export const GeneralTransforms: GeneralTransforms = {
         const newIndex = truePath[truePath.length - 1]
 
         modifyChildren(editor, Path.parent(truePath), children =>
-          insertChildren(children, newIndex, node)
+          smartInsertChildren(modifiedChildArrays, children, newIndex, node)
         )
 
         transformSelection = true
@@ -141,9 +167,10 @@ export const GeneralTransforms: GeneralTransforms = {
       case 'remove_node': {
         const { path } = op
         const index = path[path.length - 1]
+        const modifiedChildArrays = MUTATED_CHILD_ARRAYS_IN_BATCH.get(editor)
 
         modifyChildren(editor, Path.parent(path), children =>
-          removeChildren(children, index, 1)
+          smartRemoveChildren(modifiedChildArrays, children, index, 1)
         )
 
         // Transform all the points in the value, but if the point was in the
@@ -312,6 +339,8 @@ export const GeneralTransforms: GeneralTransforms = {
           let newNode: Descendant
           let nextNode: Descendant
 
+          const modifiedChildArrays = MUTATED_CHILD_ARRAYS_IN_BATCH.get(editor)
+
           if (Text.isTextNode(node)) {
             const before = node.text.slice(0, position)
             const after = node.text.slice(position)
@@ -324,26 +353,43 @@ export const GeneralTransforms: GeneralTransforms = {
               text: after,
             }
           } else {
-            const modifiedChildArrays =
-              MUTATED_CHILD_ARRAYS_IN_BATCH.get(editor)
-
-            const before = node.children.slice(0, position)
-            const after = node.children.slice(position)
-            if (modifiedChildArrays) {
-              modifiedChildArrays.add(before)
+            if (modifiedChildArrays?.has(node.children)) {
+              // modify child array in place by splicing
+              const after = node.children.splice(position)
+              nextNode = {
+                ...(properties as Partial<Element>),
+                children: after,
+              }
               modifiedChildArrays.add(after)
-            }
-            newNode = {
-              ...node,
-              children: before,
-            }
-            nextNode = {
-              ...(properties as Partial<Element>),
-              children: after,
+              // we can infer that children is mutable because its an ancestor of prev.children. Just mutate in place
+              children.splice(index + 1, 0, nextNode)
+              return children
+            } else {
+              const before = node.children.slice(0, position)
+              const after = node.children.slice(position)
+              newNode = {
+                ...node,
+                children: before,
+              }
+              nextNode = {
+                ...(properties as Partial<Element>),
+                children: after,
+              }
+              if (modifiedChildArrays) {
+                modifiedChildArrays.add(before)
+                modifiedChildArrays.add(after)
+              }
             }
           }
 
-          return replaceChildren(children, index, 1, newNode, nextNode)
+          return smartReplaceChildren(
+            modifiedChildArrays,
+            children,
+            index,
+            1,
+            newNode,
+            nextNode
+          )
         })
 
         transformSelection = true
