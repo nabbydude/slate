@@ -43,6 +43,12 @@ export interface PathInterface {
   common: (path: Path, another: Path) => Path
 
   /**
+   * Get the number of ancestors two paths share (not including the root).
+   * This is equivalent to the length of the path returned by {@link Path.common}, but doesn't allocate a new array.
+   */
+  commonDepth: (path: Path, another: Path) => number
+
+  /**
    * Compare a path to another, returning an integer indicating whether the path
    * was before, at, or after the other.
    *
@@ -207,6 +213,14 @@ export const Path: PathInterface = {
     }
 
     return common
+  },
+
+  commonDepth(path: Path, another: Path): number {
+    const min = Math.min(path.length, another.length)
+    let i = 0
+    while (i < min && path[i] === another[i]) i++
+
+    return i
   },
 
   compare(path: Path, another: Path): -1 | 0 | 1 {
