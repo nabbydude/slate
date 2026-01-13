@@ -1,13 +1,13 @@
 import {
   ExtendedType,
   Location,
-  Operation,
   Path,
   Point,
   PointEntry,
+  PointTransformingOperation,
   isObject,
 } from '..'
-import { RangeDirection } from '../types/types'
+import { RangeDirection, TextDirection } from '../types/types'
 
 /**
  * `Range` objects are a set of points that refer to a specific span of a Slate
@@ -108,7 +108,7 @@ export interface RangeInterface {
    */
   transform: (
     range: Range,
-    op: Operation,
+    op: PointTransformingOperation,
     options?: RangeTransformOptions
   ) => Range | null
 }
@@ -223,29 +223,21 @@ export const Range: RangeInterface = {
   },
 
   transform(
-    range: Range | null,
-    op: Operation,
+    range: Range,
+    op: PointTransformingOperation,
     options: RangeTransformOptions = {}
   ): Range | null {
-    if (range === null) {
-      return null
-    }
-
     const { affinity = 'inward' } = options
-    let affinityAnchor: 'forward' | 'backward' | null
-    let affinityFocus: 'forward' | 'backward' | null
+    let affinityAnchor: TextDirection | null
+    let affinityFocus: TextDirection | null
 
     if (affinity === 'inward') {
-      // If the range is collapsed, make sure to use the same affinity to
-      // avoid the two points passing each other and expanding in the opposite
-      // direction
-      const isCollapsed = Range.isCollapsed(range)
       if (Range.isForward(range)) {
         affinityAnchor = 'forward'
-        affinityFocus = isCollapsed ? affinityAnchor : 'backward'
+        affinityFocus = 'backward'
       } else {
         affinityAnchor = 'backward'
-        affinityFocus = isCollapsed ? affinityAnchor : 'forward'
+        affinityFocus = 'forward'
       }
     } else if (affinity === 'outward') {
       if (Range.isForward(range)) {
@@ -262,7 +254,11 @@ export const Range: RangeInterface = {
     const anchor = Point.transform(range.anchor, op, {
       affinity: affinityAnchor,
     })
-    const focus = Point.transform(range.focus, op, { affinity: affinityFocus })
+    // collapsed ranges will move identically unless the affinity is outward
+    const focus =
+      Range.isCollapsed(range) && affinity !== 'outward'
+        ? anchor
+        : Point.transform(range.focus, op, { affinity: affinityFocus })
 
     if (!anchor || !focus) {
       return null

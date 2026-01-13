@@ -1,4 +1,4 @@
-import { Operation, Range } from '..'
+import { Range, RangeDirection, RangeTransformingOperation } from '..'
 
 /**
  * `RangeRef` objects keep a specific range in a document synced over time as new
@@ -8,7 +8,7 @@ import { Operation, Range } from '..'
 
 export interface RangeRef {
   current: Range | null
-  affinity: 'forward' | 'backward' | 'outward' | 'inward' | null
+  affinity: RangeDirection | null
   unref(): Range | null
 }
 
@@ -16,22 +16,22 @@ export interface RangeRefInterface {
   /**
    * Transform the range ref's current value by an operation.
    */
-  transform: (ref: RangeRef, op: Operation) => void
+  transform: (ref: RangeRef, op: RangeTransformingOperation) => void
 }
 
 // eslint-disable-next-line no-redeclare
 export const RangeRef: RangeRefInterface = {
-  transform(ref: RangeRef, op: Operation): void {
+  transform(ref: RangeRef, op: RangeTransformingOperation): void {
     const { current, affinity } = ref
 
     if (current == null) {
       return
     }
 
-    const path = Range.transform(current, op, { affinity })
-    ref.current = path
+    const range = Range.transform(current, op, { affinity })
+    ref.current = range
 
-    if (path == null) {
+    if (range == null) {
       ref.unref()
     }
   },

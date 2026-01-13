@@ -123,6 +123,19 @@ export type NodeOperation =
   | SetNodeOperation
   | SplitNodeOperation
 
+export type PathTransformingOperation =
+  | InsertNodeOperation
+  | MergeNodeOperation
+  | MoveNodeOperation
+  | RemoveNodeOperation
+  | SplitNodeOperation
+
+export type PointTransformingOperation =
+  | PathTransformingOperation
+  | TextOperation
+
+export type RangeTransformingOperation = PointTransformingOperation
+
 export type SelectionOperation = SetSelectionOperation
 
 export type TextOperation = InsertTextOperation | RemoveTextOperation
@@ -168,6 +181,21 @@ export interface OperationInterface {
    * original when applied.
    */
   inverse: (op: Operation) => Operation
+
+  /**
+   * Check if an operation is of a type that could affect a Path.
+   */
+  transformsPaths: (op: Operation) => op is PathTransformingOperation
+
+  /**
+   * Check if an operation is of a type that could affect a Point.
+   */
+  transformsPoints: (op: Operation) => op is PointTransformingOperation
+
+  /**
+   * Check if an operation is of a type that could affect a Range.
+   */
+  transformsRanges: (op: Operation) => op is PointTransformingOperation
 }
 
 // eslint-disable-next-line no-redeclare
@@ -298,26 +326,46 @@ export const Operation: OperationInterface = {
       case 'set_selection': {
         const { properties, newProperties } = op
 
-        if (properties == null) {
-          return {
-            ...op,
-            properties: newProperties as Range,
-            newProperties: null,
-          }
-        } else if (newProperties == null) {
-          return {
-            ...op,
-            properties: null,
-            newProperties: properties as Range,
-          }
-        } else {
-          return { ...op, properties: newProperties, newProperties: properties }
-        }
+        // assertions are fine here because the inverse is always as valid as the original
+        return { ...op, properties: newProperties!, newProperties: properties! }
       }
 
       case 'split_node': {
         return { ...op, type: 'merge_node', path: Path.next(op.path) }
       }
     }
+  },
+
+  transformsPaths(
+    operation: Operation
+  ): operation is PathTransformingOperation {
+    switch (operation.type) {
+      case 'insert_node':
+      case 'remove_node':
+      case 'merge_node':
+      case 'split_node':
+      case 'move_node':
+        return true
+      default:
+        return false
+    }
+  },
+
+  transformsPoints(
+    operation: Operation
+  ): operation is PointTransformingOperation {
+    switch (operation.type) {
+      case 'insert_text':
+      case 'remove_text':
+        return true
+      default:
+        return Operation.transformsPaths(operation)
+    }
+  },
+
+  transformsRanges(
+    operation: Operation
+  ): operation is RangeTransformingOperation {
+    return Operation.transformsPoints(operation)
   },
 }

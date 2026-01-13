@@ -1,4 +1,4 @@
-import { Operation, Path } from '..'
+import { Path, PathTransformingOperation, TextDirection } from '..'
 
 /**
  * `PathRef` objects keep a specific path in a document synced over time as new
@@ -8,7 +8,7 @@ import { Operation, Path } from '..'
 
 export interface PathRef {
   current: Path | null
-  affinity: 'forward' | 'backward' | null
+  affinity: TextDirection | null
   unref(): Path | null
 }
 
@@ -16,12 +16,12 @@ export interface PathRefInterface {
   /**
    * Transform the path ref's current value by an operation.
    */
-  transform: (ref: PathRef, op: Operation) => void
+  transform: (ref: PathRef, op: PathTransformingOperation) => void
 }
 
 // eslint-disable-next-line no-redeclare
 export const PathRef: PathRefInterface = {
-  transform(ref: PathRef, op: Operation): void {
+  transform(ref: PathRef, op: PathTransformingOperation): void {
     const { current, affinity } = ref
 
     if (current == null) {

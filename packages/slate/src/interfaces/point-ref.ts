@@ -1,4 +1,4 @@
-import { Operation, Point } from '..'
+import { Operation, Point, PointTransformingOperation } from '..'
 import { TextDirection } from '../types/types'
 
 /**
@@ -17,12 +17,12 @@ export interface PointRefInterface {
   /**
    * Transform the point ref's current value by an operation.
    */
-  transform: (ref: PointRef, op: Operation) => void
+  transform: (ref: PointRef, op: PointTransformingOperation) => void
 }
 
 // eslint-disable-next-line no-redeclare
 export const PointRef: PointRefInterface = {
-  transform(ref: PointRef, op: Operation): void {
+  transform(ref: PointRef, op: PointTransformingOperation): void {
     const { current, affinity } = ref
 
     if (current == null) {

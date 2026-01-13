@@ -1,4 +1,10 @@
-import { ExtendedType, Operation, Path, isObject } from '..'
+import {
+  ExtendedType,
+  Operation,
+  Path,
+  PointTransformingOperation,
+  isObject,
+} from '..'
 import { TextDirection } from '../types/types'
 
 /**
@@ -51,7 +57,7 @@ export interface PointInterface {
    */
   transform: (
     point: Point,
-    op: Operation,
+    op: PointTransformingOperation,
     options?: PointTransformOptions
   ) => Point | null
 }
@@ -94,89 +100,63 @@ export const Point: PointInterface = {
   },
 
   transform(
-    point: Point | null,
-    op: Operation,
+    point: Point,
+    op: PointTransformingOperation,
     options: PointTransformOptions = {}
   ): Point | null {
-    if (point === null) {
-      return null
-    }
-
     const { affinity = 'forward' } = options
-    let { path, offset } = point
+    const { path, offset } = point
 
-    switch (op.type) {
-      case 'insert_node':
-      case 'move_node': {
-        path = Path.transform(path, op, options)!
-        break
-      }
-
-      case 'insert_text': {
-        if (
-          Path.equals(op.path, path) &&
-          (op.offset < offset ||
-            (op.offset === offset && affinity === 'forward'))
-        ) {
-          offset += op.text.length
+    if (Path.equals(op.path, path)) {
+      // Account for any changes to the point's offset
+      switch (op.type) {
+        case 'insert_text': {
+          if (
+            op.offset < offset ||
+            (op.offset === offset && affinity === 'forward')
+          ) {
+            return { path, offset: offset + op.text.length }
+          } else {
+            return point
+          }
         }
 
-        break
-      }
-
-      case 'merge_node': {
-        if (Path.equals(op.path, path)) {
-          offset += op.position
+        case 'merge_node': {
+          return { path: Path.previous(path), offset: offset + op.position }
         }
 
-        path = Path.transform(path, op, options)!
-        break
-      }
-
-      case 'remove_text': {
-        if (Path.equals(op.path, path) && op.offset <= offset) {
-          offset -= Math.min(offset - op.offset, op.text.length)
+        case 'remove_text': {
+          if (op.offset < offset) {
+            return {
+              path,
+              offset: Math.max(op.offset, offset - op.text.length),
+            }
+          } else {
+            return point
+          }
         }
 
-        break
-      }
-
-      case 'remove_node': {
-        if (Path.equals(op.path, path) || Path.isAncestor(op.path, path)) {
-          return null
-        }
-
-        path = Path.transform(path, op, options)!
-        break
-      }
-
-      case 'split_node': {
-        if (Path.equals(op.path, path)) {
+        case 'split_node': {
           if (op.position === offset && affinity == null) {
             return null
           } else if (
             op.position < offset ||
             (op.position === offset && affinity === 'forward')
           ) {
-            offset -= op.position
-
-            path = Path.transform(path, op, {
-              ...options,
-              affinity: 'forward',
-            })!
+            return { path: Path.next(path), offset: offset - op.position }
+          } else {
+            return point
           }
-        } else {
-          path = Path.transform(path, op, options)!
         }
-
-        break
       }
-
-      default:
-        return point
     }
 
-    return { path, offset }
+    const outPath = Operation.transformsPaths(op)
+      ? Path.transform(path, op, options)
+      : path
+
+    if (outPath === null) return null
+    return outPath === path ? point : { path: outPath, offset }
   },
 }
 

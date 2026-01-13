@@ -1,11 +1,4 @@
-import {
-  InsertNodeOperation,
-  MergeNodeOperation,
-  MoveNodeOperation,
-  Operation,
-  RemoveNodeOperation,
-  SplitNodeOperation,
-} from '..'
+import { Operation, PathTransformingOperation } from '..'
 import { TextDirection } from '../types/types'
 
 /**
@@ -151,12 +144,7 @@ export interface PathInterface {
    */
   operationCanTransformPath: (
     operation: Operation
-  ) => operation is
-    | InsertNodeOperation
-    | RemoveNodeOperation
-    | MergeNodeOperation
-    | SplitNodeOperation
-    | MoveNodeOperation
+  ) => operation is PathTransformingOperation
 
   /**
    * Given a path, return a new path referring to the parent node above it.
@@ -178,7 +166,7 @@ export interface PathInterface {
    */
   transform: (
     path: Path,
-    operation: Operation,
+    operation: PathTransformingOperation,
     options?: PathTransformOptions
   ) => Path | null
 }
@@ -345,22 +333,8 @@ export const Path: PathInterface = {
 
   operationCanTransformPath(
     operation: Operation
-  ): operation is
-    | InsertNodeOperation
-    | RemoveNodeOperation
-    | MergeNodeOperation
-    | SplitNodeOperation
-    | MoveNodeOperation {
-    switch (operation.type) {
-      case 'insert_node':
-      case 'remove_node':
-      case 'merge_node':
-      case 'split_node':
-      case 'move_node':
-        return true
-      default:
-        return false
-    }
+  ): operation is PathTransformingOperation {
+    return Operation.transformsPaths(operation)
   },
 
   parent(path: Path): Path {
@@ -400,129 +374,153 @@ export const Path: PathInterface = {
   },
 
   transform(
-    path: Path | null,
-    operation: Operation,
+    path: Path,
+    operation: PathTransformingOperation,
     options: PathTransformOptions = {}
   ): Path | null {
-    if (!path) return null
-
-    // PERF: use destructing instead of immer
-    const p = [...path]
+    const { type, path: op } = operation
     const { affinity = 'forward' } = options
-
-    // PERF: Exit early if the operation is guaranteed not to have an effect.
-    if (path.length === 0) {
-      return p
+    if (
+      op.length > path.length &&
+      (type !== 'move_node' || operation.newPath.length > path.length)
+    ) {
+      return path // PERF: Exit early if change is only deeper in the tree
     }
 
-    switch (operation.type) {
-      case 'insert_node': {
-        const { path: op } = operation
+    // basically if an operation causes a change earlier in the children array of an ancestor to our path it will change the index where the next deepest ancestor is found
+    // in that case then we need to shift the index at part of the path approprately.
 
-        if (
-          Path.equals(op, p) ||
-          Path.endsBefore(op, p) ||
-          Path.isAncestor(op, p)
-        ) {
-          p[op.length - 1] += 1
+    // PERF: we calculate commonDepth once instead of each function calling it seperately.
+    const commonDepth = Path.commonDepth(path, op)
+
+    const opDepth = op.length - 1 // depth of the children array where the operation is performed
+    const opEqOrAbovePath = commonDepth === op.length
+    const opEqualPath = commonDepth === path.length // only accurate because we can guarantee cd <= op.length <= p.length (except during move_node, but that doesnt use this value)
+
+    // true if `op` is an earlier sibling of `path` or of one of its ancestors
+    const opEndsBeforePath =
+      commonDepth === opDepth && op[commonDepth] < path[commonDepth]
+
+    if (!opEqOrAbovePath && !opEndsBeforePath && type !== 'move_node') {
+      return path // PERF: Exit early if operation does not affect path
+    }
+
+    const outPath = path.slice()
+    switch (type) {
+      case 'insert_node': {
+        if (opEqOrAbovePath || opEndsBeforePath) {
+          outPath[opDepth] += 1
         }
 
         break
       }
 
       case 'remove_node': {
-        const { path: op } = operation
-
-        if (Path.equals(op, p) || Path.isAncestor(op, p)) {
+        if (opEqOrAbovePath) {
           return null
-        } else if (Path.endsBefore(op, p)) {
-          p[op.length - 1] -= 1
+        } else if (opEndsBeforePath) {
+          outPath[opDepth] -= 1
         }
 
         break
       }
 
       case 'merge_node': {
-        const { path: op, position } = operation
+        const { position } = operation
 
-        if (Path.equals(op, p) || Path.endsBefore(op, p)) {
-          p[op.length - 1] -= 1
-        } else if (Path.isAncestor(op, p)) {
-          p[op.length - 1] -= 1
-          p[op.length] += position
+        if (opEqualPath || opEndsBeforePath) {
+          outPath[opDepth] -= 1
+        } else if (opEqOrAbovePath) {
+          outPath[opDepth] -= 1
+          outPath[op.length] += position
         }
 
         break
       }
 
       case 'split_node': {
-        const { path: op, position } = operation
+        const { position } = operation
 
-        if (Path.equals(op, p)) {
+        if (opEqualPath) {
           if (affinity === 'forward') {
-            p[p.length - 1] += 1
+            outPath[opDepth] += 1
           } else if (affinity === 'backward') {
-            // Nothing, because it still refers to the right path.
+            return path
           } else {
             return null
           }
-        } else if (Path.endsBefore(op, p)) {
-          p[op.length - 1] += 1
-        } else if (Path.isAncestor(op, p) && path[op.length] >= position) {
-          p[op.length - 1] += 1
-          p[op.length] -= position
+        } else if (opEndsBeforePath) {
+          outPath[opDepth] += 1
+        } else if (opEqOrAbovePath && path[commonDepth] >= position) {
+          outPath[opDepth] += 1
+          outPath[op.length] -= position
+        } else {
+          return path
         }
 
         break
       }
 
       case 'move_node': {
-        const { path: op, newPath: onp } = operation
+        const { newPath: newOp } = operation
+
+        if (opEqOrAbovePath) {
+          // we are at or inside the node being moved
+
+          const commonDepthBetween = Path.commonDepth(op, newOp)
 
         // If the old and new path are the same, it's a no-op.
-        if (Path.equals(op, onp)) {
-          return p
+          // (this is also the case if the new path is a descendant of the old path, which is invalid since a node cannot be moved inside itself)
+          if (commonDepthBetween === op.length) {
+            return path
+          }
+
+          outPath.splice(0, op.length, ...newOp)
+
+          const opEndsBeforeNewOp =
+            commonDepthBetween === opDepth &&
+            op[commonDepthBetween] < newOp[commonDepthBetween]
+
+          if (opEndsBeforeNewOp && op.length < newOp.length) {
+            // the new path is affected by the removal of the old node, adjust to compensate
+            outPath[opDepth] -= 1
+          }
+          return outPath
         }
 
-        if (Path.isAncestor(op, p) || Path.equals(op, p)) {
-          const copy = onp.slice()
+        const newCommonDepth = Path.commonDepth(path, newOp)
 
-          if (Path.endsBefore(op, onp) && op.length < onp.length) {
-            copy[op.length - 1] -= 1
-          }
+        const newOpDepth = newOp.length - 1 // depth of the children array where the new node is inserted
+        const newOpEqOrAbovePath = newCommonDepth === newOp.length
 
-          return copy.concat(p.slice(op.length))
+        // true if `newOp` is an earlier sibling of `path` or of one of its ancestors
+        const newOpEndsBeforePath =
+          newCommonDepth === newOpDepth &&
+          newOp[newCommonDepth] < path[newCommonDepth]
+
+        if (opEndsBeforePath) {
+          if (newOpEndsBeforePath && opDepth === newOpDepth) {
+            return path // affected by both insertion and removal at same depth, they cancel eachother out
         } else if (
-          Path.isSibling(op, onp) &&
-          (Path.isAncestor(onp, p) || Path.equals(onp, p))
+            (newOpEqOrAbovePath || newOpEndsBeforePath) &&
+            opDepth !== newOpDepth
         ) {
-          if (Path.endsBefore(op, p)) {
-            p[op.length - 1] -= 1
+            // affected by both insertion and removal at different depths
+            outPath[opDepth] -= 1
+            outPath[newOpDepth] += 1
           } else {
-            p[op.length - 1] += 1
+            outPath[opDepth] -= 1 // only affected by removal at old path
           }
-        } else if (
-          Path.endsBefore(onp, p) ||
-          Path.equals(onp, p) ||
-          Path.isAncestor(onp, p)
-        ) {
-          if (Path.endsBefore(op, p)) {
-            p[op.length - 1] -= 1
-          }
-
-          p[onp.length - 1] += 1
-        } else if (Path.endsBefore(op, p)) {
-          if (Path.equals(onp, p)) {
-            p[onp.length - 1] += 1
-          }
-
-          p[op.length - 1] -= 1
+        } else if (newOpEqOrAbovePath || newOpEndsBeforePath) {
+          outPath[newOpDepth] += 1 // only affected by insertion at new path
+        } else {
+          return path // totally unaffected
         }
 
         break
       }
     }
 
-    return p
+    return outPath
   },
 }
