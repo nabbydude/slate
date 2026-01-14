@@ -11,19 +11,15 @@ export const path: EditorInterface['path'] = (editor, at, options = {}) => {
       const [, lastPath] = Node.last(editor, at)
       at = lastPath
     }
-  }
-
-  if (Location.isRange(at)) {
+  } else if (Location.isRange(at)) {
     if (edge === 'start') {
-      at = Range.start(at)
+      at = Range.start(at).path
     } else if (edge === 'end') {
-      at = Range.end(at)
+      at = Range.end(at).path
     } else {
       at = Path.common(at.anchor.path, at.focus.path)
     }
-  }
-
-  if (Location.isPoint(at)) {
+  } else if (Location.isPoint(at)) {
     at = at.path
   }
 

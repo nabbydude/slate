@@ -173,8 +173,8 @@ export const GeneralTransforms: GeneralTransforms = {
                   preferNext = true
                 } else {
                   preferNext =
-                    Path.common(prev[1], path).length <
-                    Path.common(next[1], path).length
+                    Path.commonDepth(prev[1], path) <
+                    Path.commonDepth(next[1], path)
                 }
               }
 

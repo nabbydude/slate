@@ -14,7 +14,7 @@ import { TextDirection } from '../types/types'
  * object, they can be relative to any `Node` object.
  */
 
-export type Path = number[]
+export type Path = readonly number[]
 
 export interface PathAncestorsOptions {
   reverse?: boolean
@@ -29,6 +29,11 @@ export interface PathTransformOptions {
 }
 
 export interface PathInterface {
+  /**
+   * The root path, which is an empty array. Used to avoid allocating a new array each time.
+   */
+  ROOT: readonly []
+
   /**
    * Get a list of ancestor paths for a given path.
    *
@@ -185,23 +190,27 @@ export interface PathInterface {
 
 // eslint-disable-next-line no-redeclare
 export const Path: PathInterface = {
+  ROOT: Object.freeze([]),
+
   ancestors(path: Path, options: PathAncestorsOptions = {}): Path[] {
+    if (path.length === 0) return [] // root has no ancestors, empty array
     const { reverse = false } = options
-    let paths = Path.levels(path, options)
+    const paths = Path.levels(path, options)
 
     if (reverse) {
-      paths = paths.slice(1)
+      paths.unshift()
     } else {
-      paths = paths.slice(0, -1)
+      paths.pop()
     }
 
     return paths
   },
 
   common(path: Path, another: Path): Path {
-    const common: Path = []
+    const min = Math.min(path.length, another.length)
+    const common: number[] = []
 
-    for (let i = 0; i < path.length && i < another.length; i++) {
+    for (let i = 0; i < min; i++) {
       const av = path[i]
       const bv = another[i]
 
@@ -236,27 +245,16 @@ export const Path: PathInterface = {
 
   endsAfter(path: Path, another: Path): boolean {
     const i = path.length - 1
-    const as = path.slice(0, i)
-    const bs = another.slice(0, i)
-    const av = path[i]
-    const bv = another[i]
-    return Path.equals(as, bs) && av > bv
+    return Path.commonDepth(path, another) === i && path[i] > another[i]
   },
 
   endsAt(path: Path, another: Path): boolean {
-    const i = path.length
-    const as = path.slice(0, i)
-    const bs = another.slice(0, i)
-    return Path.equals(as, bs)
+    return Path.commonDepth(path, another) === path.length
   },
 
   endsBefore(path: Path, another: Path): boolean {
     const i = path.length - 1
-    const as = path.slice(0, i)
-    const bs = another.slice(0, i)
-    const av = path[i]
-    const bv = another[i]
-    return Path.equals(as, bs) && av < bv
+    return Path.commonDepth(path, another) === i && path[i] < another[i]
   },
 
   equals(path: Path, another: Path): boolean {
@@ -306,24 +304,22 @@ export const Path: PathInterface = {
   },
 
   isSibling(path: Path, another: Path): boolean {
-    if (path.length !== another.length) {
-      return false
-    }
-
-    const as = path.slice(0, -1)
-    const bs = another.slice(0, -1)
-    const al = path[path.length - 1]
-    const bl = another[another.length - 1]
-    return al !== bl && Path.equals(as, bs)
+    return (
+      path.length === another.length &&
+      Path.commonDepth(path, another) === path.length - 1
+    )
   },
 
   levels(path: Path, options: PathLevelsOptions = {}): Path[] {
     const { reverse = false } = options
-    const list: Path[] = []
+    const list: Path[] = [Path.ROOT]
 
-    for (let i = 0; i <= path.length; i++) {
+    if (path.length === 0) return list
+
+    for (let i = 1; i < path.length; i++) {
       list.push(path.slice(0, i))
     }
+    list.push(path)
 
     if (reverse) {
       list.reverse()
@@ -339,8 +335,9 @@ export const Path: PathInterface = {
       )
     }
 
-    const last = path[path.length - 1]
-    return path.slice(0, -1).concat(last + 1)
+    const out = path.slice()
+    out[path.length - 1] += 1
+    return out
   },
 
   operationCanTransformPath(
@@ -378,19 +375,19 @@ export const Path: PathInterface = {
       )
     }
 
-    const last = path[path.length - 1]
-
-    if (last <= 0) {
+    if (!Path.hasPrevious(path)) {
       throw new Error(
         `Cannot get the previous path of a first child path [${path}] because it would result in a negative index.`
       )
     }
 
-    return path.slice(0, -1).concat(last - 1)
+    const out = path.slice()
+    out[out.length - 1] -= 1
+    return out
   },
 
   relative(path: Path, ancestor: Path): Path {
-    if (!Path.isAncestor(ancestor, path) && !Path.equals(path, ancestor)) {
+    if (!Path.isCommon(ancestor, path)) {
       throw new Error(
         `Cannot get the relative path of [${path}] inside ancestor [${ancestor}], because it is not above or equal to the path.`
       )
