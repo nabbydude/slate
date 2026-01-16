@@ -8,6 +8,7 @@ import {
   Path,
   Point,
   Range,
+  RangeTransformingOperation,
   Scrubber,
   Selection,
   Text,
@@ -341,13 +342,13 @@ export const GeneralTransforms: GeneralTransforms = {
     }
 
     if (transformSelection && editor.selection) {
-      const selection = { ...editor.selection }
+      const selection = Range.transform(
+        editor.selection,
+        op as RangeTransformingOperation // transformSelection is only true for ops that transform ranges
+      )
 
-      for (const [point, key] of Range.points(selection)) {
-        selection[key] = Point.transform(point, op)!
-      }
-
-      if (!Range.equals(selection, editor.selection)) {
+      // TODO: once we have tests to validate that noops return the same object reference then this conditional can be removed
+      if (!selection || !Range.equals(selection, editor.selection)) {
         editor.selection = selection
       }
     }

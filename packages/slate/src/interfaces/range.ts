@@ -254,15 +254,15 @@ export const Range: RangeInterface = {
     const anchor = Point.transform(range.anchor, op, {
       affinity: affinityAnchor,
     })
-    // collapsed ranges will move identically unless the affinity is outward
-    const focus =
-      Range.isCollapsed(range) && affinity !== 'outward'
-        ? anchor
-        : Point.transform(range.focus, op, { affinity: affinityFocus })
+    if (!anchor) return null
 
-    if (!anchor || !focus) {
-      return null
+    // collapsed ranges will move identically unless the affinity is outward
+    if (Range.isCollapsed(range) && affinity !== 'outward') {
+      return { anchor, focus: anchor }
     }
+
+    const focus = Point.transform(range.focus, op, { affinity: affinityFocus })
+    if (!focus) return null
 
     return { anchor, focus }
   },

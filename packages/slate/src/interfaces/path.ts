@@ -469,7 +469,7 @@ export const Path: PathInterface = {
 
           const commonDepthBetween = Path.commonDepth(op, newOp)
 
-        // If the old and new path are the same, it's a no-op.
+          // If the old and new path are the same, it's a no-op.
           // (this is also the case if the new path is a descendant of the old path, which is invalid since a node cannot be moved inside itself)
           if (commonDepthBetween === op.length) {
             return path
@@ -501,10 +501,10 @@ export const Path: PathInterface = {
         if (opEndsBeforePath) {
           if (newOpEndsBeforePath && opDepth === newOpDepth) {
             return path // affected by both insertion and removal at same depth, they cancel eachother out
-        } else if (
+          } else if (
             (newOpEqOrAbovePath || newOpEndsBeforePath) &&
             opDepth !== newOpDepth
-        ) {
+          ) {
             // affected by both insertion and removal at different depths
             outPath[opDepth] -= 1
             outPath[newOpDepth] += 1

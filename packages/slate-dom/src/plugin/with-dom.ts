@@ -123,30 +123,36 @@ export const withDOM = <T extends BaseEditor>(
     const matches: [Path, Key][] = []
     const pathRefMatches: [PathRef, Key][] = []
 
-    const pendingDiffs = EDITOR_TO_PENDING_DIFFS.get(e)
-    if (pendingDiffs?.length) {
-      const transformed = pendingDiffs
-        .map(textDiff => transformTextDiff(textDiff, op))
-        .filter(Boolean) as TextDiff[]
+    // all ops that transform points also transform ranges and vice versa so one check is fine
+    // if that changes we'll get a type error somewhere here
+    if (Operation.transformsPoints(op)) {
+      const pendingDiffs = EDITOR_TO_PENDING_DIFFS.get(e)
+      if (pendingDiffs?.length) {
+        const transformed = pendingDiffs
+          .map(textDiff => transformTextDiff(textDiff, op))
+          .filter(Boolean) as TextDiff[]
 
-      EDITOR_TO_PENDING_DIFFS.set(e, transformed)
-    }
+        EDITOR_TO_PENDING_DIFFS.set(e, transformed)
+      }
 
-    const pendingSelection = EDITOR_TO_PENDING_SELECTION.get(e)
-    if (pendingSelection) {
-      EDITOR_TO_PENDING_SELECTION.set(
-        e,
-        transformPendingRange(e, pendingSelection, op)
-      )
-    }
+      const pendingSelection = EDITOR_TO_PENDING_SELECTION.get(e)
+      if (pendingSelection) {
+        EDITOR_TO_PENDING_SELECTION.set(
+          e,
+          transformPendingRange(e, pendingSelection, op)
+        )
+      }
 
-    const pendingAction = EDITOR_TO_PENDING_ACTION.get(e)
-    if (pendingAction?.at) {
-      const at = Location.isPoint(pendingAction?.at)
-        ? transformPendingPoint(e, pendingAction.at, op)
-        : transformPendingRange(e, pendingAction.at, op)
-
-      EDITOR_TO_PENDING_ACTION.set(e, at ? { ...pendingAction, at } : null)
+      const pendingAction = EDITOR_TO_PENDING_ACTION.get(e)
+      if (pendingAction?.at) {
+        const { at, run } = pendingAction
+        const newAt = Location.isPoint(at)
+          ? transformPendingPoint(e, at, op)
+          : transformPendingRange(e, at, op)
+        if (newAt !== at) {
+          EDITOR_TO_PENDING_ACTION.set(e, newAt ? { at: newAt, run } : null)
+        }
+      }
     }
 
     switch (op.type) {

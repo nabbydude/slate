@@ -151,11 +151,10 @@ export const Point: PointInterface = {
       }
     }
 
-    const outPath = Operation.transformsPaths(op)
-      ? Path.transform(path, op, options)
-      : path
+    if (!Operation.transformsPaths(op)) return point
 
-    if (outPath === null) return null
+    const outPath = Path.transform(path, op, options)
+    if (!outPath) return null
     return outPath === path ? point : { path: outPath, offset }
   },
 }
