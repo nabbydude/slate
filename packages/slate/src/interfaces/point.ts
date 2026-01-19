@@ -87,7 +87,8 @@ export const Point: PointInterface = {
   equals(point: Point, another: Point): boolean {
     // PERF: ensure the offsets are equal first since they are cheaper to check.
     return (
-      point.offset === another.offset && Path.equals(point.path, another.path)
+      point === another ||
+      (point.offset === another.offset && Path.equals(point.path, another.path))
     )
   },
 

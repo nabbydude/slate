@@ -17,6 +17,8 @@ export const isDeepEqual = (
   for (const key in node) {
     const a = node[key]
     const b = another[key]
+    if (a === b) continue
+
     if (Array.isArray(a) && Array.isArray(b)) {
       if (a.length !== b.length) return false
       for (let i = 0; i < a.length; i++) {
@@ -24,7 +26,7 @@ export const isDeepEqual = (
       }
     } else if (isObject(a) && isObject(b)) {
       if (!isDeepEqual(a, b)) return false
-    } else if (a !== b) {
+    } else {
       return false
     }
   }

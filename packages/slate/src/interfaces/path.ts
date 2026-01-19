@@ -249,7 +249,8 @@ export const Path: PathInterface = {
 
   equals(path: Path, another: Path): boolean {
     return (
-      path.length === another.length && path.every((n, i) => n === another[i])
+      path === another ||
+      (path.length === another.length && path.every((n, i) => n === another[i]))
     )
   },
 

@@ -130,8 +130,9 @@ export const Range: RangeInterface = {
 
   equals(range: Range, another: Range): boolean {
     return (
-      Point.equals(range.anchor, another.anchor) &&
-      Point.equals(range.focus, another.focus)
+      range === another ||
+      (Point.equals(range.anchor, another.anchor) &&
+        Point.equals(range.focus, another.focus))
     )
   },
 
