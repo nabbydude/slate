@@ -305,8 +305,8 @@ export const Operation: OperationInterface = {
         // and find the original path. We can accomplish this (only in non-sibling)
         // moves by looking at the impact of the move operation on the node
         // after the original move path.
-        const inversePath = Path.transform(path, op)!
-        const inverseNewPath = Path.transform(Path.next(path), op)!
+        const inversePath = Path.transform(path, op)
+        const inverseNewPath = Path.transform(Path.next(path), op)
         return { ...op, path: inversePath, newPath: inverseNewPath }
       }
 

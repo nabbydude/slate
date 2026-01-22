@@ -374,7 +374,7 @@ export function transformTextDiff(
         return {
           diff: { start: start + op.position, end: end + op.position, text },
           id,
-          path: Path.transform(path, op)!,
+          path: Path.transform(path, op),
         }
       }
     }

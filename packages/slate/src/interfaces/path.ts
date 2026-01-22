@@ -1,4 +1,9 @@
-import { Operation, PathTransformingOperation } from '..'
+import {
+  Operation,
+  PathTransformingOperation,
+  RemoveNodeOperation,
+  SplitNodeOperation,
+} from '..'
 import { TextDirection } from '../types/types'
 
 /**
@@ -164,11 +169,24 @@ export interface PathInterface {
   /**
    * Transform a path by an operation.
    */
-  transform: (
+  transform(
+    path: Path,
+    operation: Exclude<
+      PathTransformingOperation,
+      RemoveNodeOperation | SplitNodeOperation
+    >,
+    options?: PathTransformOptions
+  ): Path
+  transform(
+    path: Path,
+    operation: SplitNodeOperation,
+    options?: Exclude<PathTransformOptions, { affinity: null }>
+  ): Path
+  transform(
     path: Path,
     operation: PathTransformingOperation,
     options?: PathTransformOptions
-  ) => Path | null
+  ): Path | null
 }
 
 // eslint-disable-next-line no-redeclare
@@ -374,11 +392,11 @@ export const Path: PathInterface = {
     return path.slice(ancestor.length)
   },
 
-  transform(
+  transform: ((
     path: Path,
     operation: PathTransformingOperation,
     options: PathTransformOptions = {}
-  ): Path | null {
+  ): Path | null => {
     const { type, path: op } = operation
     const { affinity = 'forward' } = options
     if (
@@ -523,5 +541,5 @@ export const Path: PathInterface = {
     }
 
     return outPath
-  },
+  }) as PathInterface['transform'],
 }

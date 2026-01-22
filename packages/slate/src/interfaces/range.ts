@@ -4,7 +4,9 @@ import {
   Path,
   Point,
   PointEntry,
-  PointTransformingOperation,
+  RangeTransformingOperation,
+  RemoveNodeOperation,
+  SplitNodeOperation,
   isObject,
 } from '..'
 import { RangeDirection, TextDirection } from '../types/types'
@@ -106,11 +108,24 @@ export interface RangeInterface {
   /**
    * Transform a range by an operation.
    */
-  transform: (
+  transform(
     range: Range,
-    op: PointTransformingOperation,
+    operation: Exclude<
+      RangeTransformingOperation,
+      RemoveNodeOperation | SplitNodeOperation
+    >,
     options?: RangeTransformOptions
-  ) => Range | null
+  ): Range
+  transform(
+    range: Range,
+    operation: SplitNodeOperation,
+    options?: RangeTransformOptions & { affinity?: TextDirection }
+  ): Range
+  transform(
+    range: Range,
+    op: RangeTransformingOperation,
+    options?: RangeTransformOptions
+  ): Range | null
 }
 
 // eslint-disable-next-line no-redeclare
@@ -223,11 +238,11 @@ export const Range: RangeInterface = {
     return start
   },
 
-  transform(
+  transform: ((
     range: Range,
-    op: PointTransformingOperation,
+    op: RangeTransformingOperation,
     options: RangeTransformOptions = {}
-  ): Range | null {
+  ): Range | null => {
     const { affinity = 'inward' } = options
     let affinityAnchor: TextDirection | null
     let affinityFocus: TextDirection | null
@@ -258,13 +273,17 @@ export const Range: RangeInterface = {
     if (!anchor) return null
 
     // collapsed ranges will move identically unless the affinity is outward
-    if (Range.isCollapsed(range) && affinity !== 'outward') {
-      return { anchor, focus: anchor }
+    if (affinity !== 'outward' && Range.isCollapsed(range)) {
+      return anchor === range.anchor ? range : { anchor, focus: anchor }
     }
 
     const focus = Point.transform(range.focus, op, { affinity: affinityFocus })
     if (!focus) return null
 
+    if (anchor === range.anchor && focus === range.focus) return range
+
+    if (Point.equals(anchor, focus)) return { anchor, focus: anchor }
+
     return { anchor, focus }
-  },
+  }) as RangeInterface['transform'],
 }

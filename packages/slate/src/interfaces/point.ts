@@ -3,6 +3,8 @@ import {
   Operation,
   Path,
   PointTransformingOperation,
+  RemoveNodeOperation,
+  SplitNodeOperation,
   isObject,
 } from '..'
 import { TextDirection } from '../types/types'
@@ -55,11 +57,24 @@ export interface PointInterface {
   /**
    * Transform a point by an operation.
    */
-  transform: (
+  transform(
     point: Point,
-    op: PointTransformingOperation,
+    operation: Exclude<
+      PointTransformingOperation,
+      RemoveNodeOperation | SplitNodeOperation
+    >,
     options?: PointTransformOptions
-  ) => Point | null
+  ): Point
+  transform(
+    point: Point,
+    operation: SplitNodeOperation,
+    options?: PointTransformOptions & { affinity?: TextDirection }
+  ): Point
+  transform(
+    point: Point,
+    operation: PointTransformingOperation,
+    options?: PointTransformOptions
+  ): Point | null
 }
 
 // eslint-disable-next-line no-redeclare
@@ -100,11 +115,11 @@ export const Point: PointInterface = {
     )
   },
 
-  transform(
+  transform: ((
     point: Point,
     op: PointTransformingOperation,
     options: PointTransformOptions = {}
-  ): Point | null {
+  ): Point | null => {
     const { affinity = 'forward' } = options
     const { path, offset } = point
 
@@ -157,7 +172,7 @@ export const Point: PointInterface = {
     const outPath = Path.transform(path, op, options)
     if (!outPath) return null
     return outPath === path ? point : { path: outPath, offset }
-  },
+  }) as PointInterface['transform'],
 }
 
 /**
