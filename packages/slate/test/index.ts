@@ -4,6 +4,13 @@ import { fixtures } from '../../../support/fixtures'
 import { Editor, Element, Operation, createEditor } from 'slate'
 import { createHyperscript } from 'slate-hyperscript'
 
+export const jsx = createHyperscript({
+  elements: {
+    block: {},
+    inline: { inline: true },
+  },
+})
+
 describe('slate', () => {
   fixtures<{
     input: unknown
@@ -140,10 +147,3 @@ const withBatchTest = (editor: Editor, dirties: string[]) => {
   }
   return editor
 }
-
-export const jsx = createHyperscript({
-  elements: {
-    block: {},
-    inline: { inline: true },
-  },
-})
