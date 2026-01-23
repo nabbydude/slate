@@ -344,7 +344,8 @@ export const GeneralTransforms: GeneralTransforms = {
     if (transformSelection && editor.selection) {
       const selection = Range.transform(
         editor.selection,
-        op as RangeTransformingOperation // transformSelection is only true for ops that transform ranges
+        op as RangeTransformingOperation, // transformSelection is only true for ops that transform ranges
+        { affinity: 'forward' }
       )
 
       // TODO: once we have tests to validate that noops return the same object reference then this conditional can be removed
