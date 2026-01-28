@@ -124,7 +124,6 @@ export const withDOM = <T extends BaseEditor>(
     const pathRefMatches: [PathRef, Key][] = []
 
     // all ops that transform points also transform ranges and vice versa so one check is fine
-    // if that changes we'll get a type error somewhere here
     if (Operation.transformsPoints(op)) {
       const pendingDiffs = EDITOR_TO_PENDING_DIFFS.get(e)
       if (pendingDiffs?.length) {

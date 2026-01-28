@@ -2,7 +2,6 @@ import {
   ExtendedType,
   Operation,
   Path,
-  PointTransformingOperation,
   RemoveNodeOperation,
   SplitNodeOperation,
   isObject,
@@ -59,10 +58,7 @@ export interface PointInterface {
    */
   transform(
     point: Point,
-    operation: Exclude<
-      PointTransformingOperation,
-      RemoveNodeOperation | SplitNodeOperation
-    >,
+    operation: Exclude<Operation, RemoveNodeOperation | SplitNodeOperation>,
     options?: PointTransformOptions
   ): Point
   transform(
@@ -72,7 +68,7 @@ export interface PointInterface {
   ): Point
   transform(
     point: Point,
-    operation: PointTransformingOperation,
+    operation: Operation,
     options?: PointTransformOptions
   ): Point | null
 }
@@ -117,10 +113,11 @@ export const Point: PointInterface = {
 
   transform: ((
     point: Point,
-    op: PointTransformingOperation,
+    op: Operation,
     options: PointTransformOptions = {}
   ): Point | null => {
     const { affinity = 'forward' } = options
+    if (!('path' in op)) return point
     const { path, offset } = point
 
     if (Path.equals(op.path, path)) {

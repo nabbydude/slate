@@ -171,10 +171,7 @@ export interface PathInterface {
    */
   transform(
     path: Path,
-    operation: Exclude<
-      PathTransformingOperation,
-      RemoveNodeOperation | SplitNodeOperation
-    >,
+    operation: Exclude<Operation, RemoveNodeOperation | SplitNodeOperation>,
     options?: PathTransformOptions
   ): Path
   transform(
@@ -184,7 +181,7 @@ export interface PathInterface {
   ): Path
   transform(
     path: Path,
-    operation: PathTransformingOperation,
+    operation: Operation,
     options?: PathTransformOptions
   ): Path | null
 }
@@ -394,11 +391,13 @@ export const Path: PathInterface = {
 
   transform: ((
     path: Path,
-    operation: PathTransformingOperation,
+    operation: Operation,
     options: PathTransformOptions = {}
   ): Path | null => {
-    const { type, path: op } = operation
-    const { affinity = 'forward' } = options
+    const { type } = operation
+    if (!('path' in operation)) return path
+    const { path: op } = operation
+
     if (
       op.length > path.length &&
       (type !== 'move_node' || operation.newPath.length > path.length)
@@ -406,8 +405,7 @@ export const Path: PathInterface = {
       return path // PERF: Exit early if change is only deeper in the tree
     }
 
-    // basically if an operation causes a change earlier in the children array of an ancestor to our path it will change the index where the next deepest ancestor is found
-    // in that case then we need to shift the index at part of the path approprately.
+    // basically if an operation shifts the earlier children of an ancestor, our path needs to shift index to compensate
 
     // PERF: we calculate commonDepth once instead of each function calling it seperately.
     const commonDepth = Path.commonDepth(path, op)
@@ -431,7 +429,7 @@ export const Path: PathInterface = {
           outPath[opDepth] += 1
         }
 
-        break
+        return outPath
       }
 
       case 'remove_node': {
@@ -441,7 +439,7 @@ export const Path: PathInterface = {
           outPath[opDepth] -= 1
         }
 
-        break
+        return outPath
       }
 
       case 'merge_node': {
@@ -454,11 +452,12 @@ export const Path: PathInterface = {
           outPath[op.length] += position
         }
 
-        break
+        return outPath
       }
 
       case 'split_node': {
         const { position } = operation
+        const { affinity = 'forward' } = options
 
         if (opEqualPath) {
           if (affinity === 'forward') {
@@ -477,7 +476,7 @@ export const Path: PathInterface = {
           return path
         }
 
-        break
+        return outPath
       }
 
       case 'move_node': {
@@ -536,10 +535,10 @@ export const Path: PathInterface = {
           return path // totally unaffected
         }
 
-        break
+        return outPath
       }
     }
 
-    return outPath
+    return path
   }) as PathInterface['transform'],
 }

@@ -1,10 +1,10 @@
 import {
   ExtendedType,
   Location,
+  Operation,
   Path,
   Point,
   PointEntry,
-  RangeTransformingOperation,
   RemoveNodeOperation,
   SplitNodeOperation,
   isObject,
@@ -110,10 +110,7 @@ export interface RangeInterface {
    */
   transform(
     range: Range,
-    operation: Exclude<
-      RangeTransformingOperation,
-      RemoveNodeOperation | SplitNodeOperation
-    >,
+    operation: Exclude<Operation, RemoveNodeOperation | SplitNodeOperation>,
     options?: RangeTransformOptions
   ): Range
   transform(
@@ -123,7 +120,7 @@ export interface RangeInterface {
   ): Range
   transform(
     range: Range,
-    op: RangeTransformingOperation,
+    op: Operation,
     options?: RangeTransformOptions
   ): Range | null
 }
@@ -240,7 +237,7 @@ export const Range: RangeInterface = {
 
   transform: ((
     range: Range,
-    op: RangeTransformingOperation,
+    op: Operation,
     options: RangeTransformOptions = {}
   ): Range | null => {
     const { affinity = 'inward' } = options
