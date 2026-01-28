@@ -125,8 +125,9 @@ export const Point: PointInterface = {
       switch (op.type) {
         case 'insert_text': {
           if (
-            op.offset < offset ||
-            (op.offset === offset && affinity === 'forward')
+            (op.offset < offset ||
+              (op.offset === offset && affinity === 'forward')) &&
+            op.text.length > 0
           ) {
             return { path, offset: offset + op.text.length }
           } else {
@@ -139,7 +140,7 @@ export const Point: PointInterface = {
         }
 
         case 'remove_text': {
-          if (op.offset < offset) {
+          if (op.offset < offset && op.text.length > 0) {
             return {
               path,
               offset: Math.max(op.offset, offset - op.text.length),
