@@ -7,7 +7,6 @@ import {
   Operation,
   Path,
   PathTransformOptions,
-  PathTransformingOperation,
   Transforms,
 } from 'slate'
 import { createTree } from '../../test-utils/transforms'
@@ -19,7 +18,7 @@ const affinities: PathTransformOptions['affinity'][] = [
   null,
 ]
 
-describe.only('.transform', () => {
+describe('.transform', () => {
   const root = createTree()
 
   const [[operandNode, operandPath]] = Editor.nodes<Element>(root, {
@@ -27,7 +26,7 @@ describe.only('.transform', () => {
     match: n => n.id === 'operand',
   })
 
-  const testItNeverMutatesInputs = (op: PathTransformingOperation) => {
+  const testItNeverMutatesInputs = (op: Operation) => {
     return it('never mutates inputs', () => {
       const opCopy = structuredClone(op)
       for (const [node, path] of Node.nodes(root)) {
@@ -39,48 +38,7 @@ describe.only('.transform', () => {
     })
   }
 
-  const testItNeverReturnsNull = (op: PathTransformingOperation) => {
-    return it('never returns null', () => {
-      for (const [node, path] of Node.nodes(root)) {
-        assert.notEqual(
-          Path.transform(path, op),
-          null,
-          `returns null for ${node.id}`
-        )
-      }
-    })
-  }
-
-  const testItIsNotAffectedByAffinity = (op: PathTransformingOperation) => {
-    return it('is not affected by affinity', () => {
-      for (const [node, path] of Node.nodes(root)) {
-        const baseline = Path.transform(path, op)
-
-        for (const affinity of affinities) {
-          assert.deepEqual(
-            Path.transform(path, op, { affinity }),
-            baseline,
-            `is for ${node.id} called with affinity ${affinity}`
-          )
-        }
-      }
-    })
-  }
-
-  const testItIsReversibleWhenNotNull = (op: PathTransformingOperation) => {
-    return it('is reversible when not null', () => {
-      const invserseOp = Operation.inverse(op) as PathTransformingOperation
-      for (const [node, path] of Node.nodes(root)) {
-        const transformedPath = Path.transform(path, op)
-        if (!transformedPath) continue
-        const untransformedPath = Path.transform(transformedPath, invserseOp)
-
-        assert.deepEqual(untransformedPath, path, `isn't for ${node.id}`)
-      }
-    })
-  }
-
-  const testItReturnsTheInputIfUnchanged = (op: PathTransformingOperation) => {
+  const testItReturnsTheInputIfUnchanged = (op: Operation) => {
     return it('returns the input if unchanged', () => {
       for (const [node, path] of Node.nodes(root)) {
         if (node.id === 'operand') {
@@ -96,13 +54,41 @@ describe.only('.transform', () => {
           }
         } else {
           const result = Path.transform(path, op)
-          if (result && Path.equals(result, path)) {
-            assert.equal(
+          if (result !== path) {
+            assert.notDeepEqual(
               result,
               path,
               `returned different ref with same value for ${node.id}`
             )
           }
+        }
+      }
+    })
+  }
+
+  const testItNeverReturnsNull = (op: Operation) => {
+    return it('never returns null', () => {
+      for (const [node, path] of Node.nodes(root)) {
+        assert.notEqual(
+          Path.transform(path, op),
+          null,
+          `returns null for ${node.id}`
+        )
+      }
+    })
+  }
+
+  const testItIsNotAffectedByAffinity = (op: Operation) => {
+    return it('is not affected by affinity', () => {
+      for (const [node, path] of Node.nodes(root)) {
+        const baseline = Path.transform(path, op)
+
+        for (const affinity of affinities) {
+          assert.deepEqual(
+            Path.transform(path, op, { affinity }),
+            baseline,
+            `is for ${node.id} called with affinity ${affinity}`
+          )
         }
       }
     })
@@ -116,9 +102,9 @@ describe.only('.transform', () => {
     }
 
     testItNeverMutatesInputs(op)
+    testItReturnsTheInputIfUnchanged(op)
     testItNeverReturnsNull(op)
     testItIsNotAffectedByAffinity(op)
-    testItReturnsTheInputIfUnchanged(op)
 
     it('matches Transforms.transform', () => {
       for (const [node, path] of Node.nodes(root)) {
@@ -134,14 +120,14 @@ describe.only('.transform', () => {
 
   describe('called with remove_node', () => {
     const op: Operation = {
-      type: 'insert_node',
+      type: 'remove_node',
       path: operandPath,
-      node: { id: 'inserted', children: [] },
+      node: operandNode,
     }
 
     testItNeverMutatesInputs(op)
+    testItReturnsTheInputIfUnchanged(op)
     testItIsNotAffectedByAffinity(op)
-    testItIsReversibleWhenNotNull(op)
 
     it('matches Transforms.transform', () => {
       for (const [node, path] of Node.nodes(root)) {
@@ -149,48 +135,37 @@ describe.only('.transform', () => {
 
         const anotherTree = createTree()
         Transforms.transform(anotherTree, op)
-        const nodeAtNewPath = Node.get(anotherTree, newPath)
-        assert.equal(nodeAtNewPath.id, node.id, `does not match for ${node.id}`)
+        if (newPath) {
+          const nodeAtNewPath = Node.get(anotherTree, newPath)
+          assert.equal(
+            nodeAtNewPath.id,
+            node.id,
+            `does not match for ${node.id}`
+          )
+        } else {
+          const [entry] = Editor.nodes<Element>(anotherTree, {
+            at: [],
+            match: n => n.id === node.id,
+          })
+          assert.equal(entry, undefined, `does not match for ${node.id}`)
+        }
       }
     })
   })
 
   describe('called with merge_node', () => {
-    const { children, ...properties } = operandNode
     // this means operand will be merged into earlier sibling
     const op: Operation = {
       type: 'merge_node',
       path: operandPath,
-      position: 1,
-      properties,
+      position: 3,
+      properties: { ...operandNode, children: undefined },
     }
 
     testItNeverMutatesInputs(op)
+    testItReturnsTheInputIfUnchanged(op)
     testItNeverReturnsNull(op)
     testItIsNotAffectedByAffinity(op)
-    testItReturnsTheInputIfUnchanged(op)
-
-    it('is reversible', () => {
-      const invserseOp = Operation.inverse(op) as PathTransformingOperation
-      for (const [node, path] of Node.nodes(root)) {
-        const transformedPath = Path.transform(path, op)
-        if (node.id === 'earlier sibling') {
-          const untransformedPath = Path.transform(
-            transformedPath,
-            invserseOp,
-            { affinity: 'backward' }
-          )
-          assert.deepEqual(
-            untransformedPath,
-            path,
-            `isn't for ${node.id} (with backward affinity for inverse operation)`
-          )
-        } else {
-          const untransformedPath = Path.transform(transformedPath, invserseOp)
-          assert.deepEqual(untransformedPath, path, `isn't for ${node.id}`)
-        }
-      }
-    })
 
     it('matches Transforms.transform', () => {
       for (const [node, path] of Node.nodes(root)) {
@@ -226,51 +201,48 @@ describe.only('.transform', () => {
     }
 
     testItNeverMutatesInputs(op)
-    testItIsReversibleWhenNotNull(op)
     testItReturnsTheInputIfUnchanged(op)
 
-    it('returns null for operand node with null affinity', () => {
-      assert.equal(
-        Path.transform(operandPath, op, { affinity: null }),
-        null,
-        `does not return null for operand with null affinity`
-      )
-    })
-
-    it('does not return null for any other node or affinity', () => {
+    it('returns null only for split node with null affinity', () => {
       for (const [node, path] of Node.nodes(root)) {
         for (const affinity of affinities) {
-          if (node.id === 'operand' && affinity === null) continue
-          assert.notEqual(
-            Path.transform(path, op),
-            null,
-            `returns null for ${node.id} with ${affinity} affinity`
-          )
+          if (node.id === 'operand' && affinity === null) {
+            assert.equal(
+              Path.transform(operandPath, op, { affinity: null }),
+              null,
+              `does not return null for operand with null affinity`
+            )
+          } else {
+            assert.notEqual(
+              Path.transform(path, op, { affinity }),
+              null,
+              `returns null for ${node.id} with ${affinity} affinity`
+            )
+          }
         }
       }
     })
 
-    it('is affected by affinity for operand node', () => {
-      const backwardAffinity = Path.transform(operandPath, op, {
-        affinity: 'backward',
-      })
-      const forwardAffinity = Path.transform(operandPath, op, {
-        affinity: 'forward',
-      })
-      assert.notDeepEqual(backwardAffinity, forwardAffinity)
-    })
-
-    it('is not affected by affinity for any other node', () => {
+    it('is affected by affinity only for split node', () => {
       for (const [node, path] of Node.nodes(root)) {
-        const baseline = Path.transform(path, op)
+        if (node.id === 'operand') {
+          const backwardAffinity = Path.transform(operandPath, op, {
+            affinity: 'backward',
+          })
+          const forwardAffinity = Path.transform(operandPath, op, {
+            affinity: 'forward',
+          })
+          assert.notDeepEqual(backwardAffinity, forwardAffinity)
+        } else {
+          const baseline = Path.transform(path, op)
 
-        for (const affinity of affinities) {
-          if (node.id === 'operand') continue
-          assert.deepEqual(
-            Path.transform(path, op, { affinity }),
-            baseline,
-            `is for ${node.id} called with affinity ${affinity}`
-          )
+          for (const affinity of affinities) {
+            assert.deepEqual(
+              Path.transform(path, op, { affinity }),
+              baseline,
+              `is for ${node.id} called with affinity ${affinity}`
+            )
+          }
         }
       }
     })
@@ -303,19 +275,18 @@ describe.only('.transform', () => {
         Transforms.transform(anotherTree, op)
         const nodeAtNewPath = Node.get(anotherTree, newPath)
         assert.equal(nodeAtNewPath.id, node.id, `does not match for ${node.id}`)
+        if (node.id === 'operand') {
+          // now for split sibling
+          const otherNewPath = Path.transform(path, op, { affinity: 'forward' })
+
+          const nodeAtOtherNewPath = Node.get(anotherTree, otherNewPath)
+          assert.equal(
+            nodeAtOtherNewPath.id,
+            op.properties.id,
+            `does not match for ${op.properties.id}`
+          )
+        }
       }
-
-      // now for split sibling
-      const newPath = Path.transform(operandPath, op, { affinity: 'forward' })
-
-      const anotherTree = createTree()
-      Transforms.transform(anotherTree, op)
-      const nodeAtNewPath = Node.get(anotherTree, newPath)
-      assert.equal(
-        nodeAtNewPath.id,
-        op.properties.id,
-        `does not match for ${op.properties.id}`
-      )
     })
   })
 
@@ -356,20 +327,29 @@ describe.only('.transform', () => {
       }
     })
 
-    it('is reversible and never returns null', () => {
+    it('returns the input if unchanged', () => {
       for (const [opNode, op] of ops) {
-        const invserseOp = Operation.inverse(op) as PathTransformingOperation
         for (const [node, path] of Node.nodes(root)) {
-          const transformedPath = Path.transform(path, op)
-          assert.ok(
-            transformedPath,
+          const result = Path.transform(path, op)
+          if (result !== path) {
+            assert.notDeepEqual(
+              result,
+              path,
+              `returned different ref with same value for ${node.id} when moving from ${opNode.id}`
+            )
+          }
+        }
+      }
+    })
+
+    it('never returns null', () => {
+      for (const [opNode, op] of ops) {
+        for (const [node, path] of Node.nodes(root)) {
+          const newPath = Path.transform(path, op)
+          assert.notEqual(
+            newPath,
+            null,
             `returns null for ${node.id} when moving from ${opNode.id}`
-          )
-          const untransformedPath = Path.transform(transformedPath, invserseOp)
-          assert.deepEqual(
-            untransformedPath,
-            path,
-            `isn't for ${node.id} when moving from ${opNode.id}`
           )
         }
       }
@@ -385,38 +365,6 @@ describe.only('.transform', () => {
               Path.transform(path, op, { affinity }),
               baseline,
               `is for ${node.id} called with affinity ${affinity} when moving from ${opNode.id}`
-            )
-          }
-        }
-      }
-    })
-
-    it('is reversible', () => {
-      for (const [opNode, op] of ops) {
-        const invserseOp = Operation.inverse(op) as PathTransformingOperation
-        for (const [node, path] of Node.nodes(root)) {
-          const transformedPath = Path.transform(path, op)
-          if (!transformedPath) continue
-          const untransformedPath = Path.transform(transformedPath, invserseOp)
-
-          assert.deepEqual(
-            untransformedPath,
-            path,
-            `isn't for ${node.id} when moving from ${opNode.id}`
-          )
-        }
-      }
-    })
-
-    it('returns the input if unchanged', () => {
-      for (const [opNode, op] of ops) {
-        for (const [node, path] of Node.nodes(root)) {
-          const result = Path.transform(path, op)
-          if (result !== path) {
-            assert.notDeepEqual(
-              result,
-              path,
-              `returned different ref with same value for ${node.id} when moving from ${opNode.id}`
             )
           }
         }
@@ -439,5 +387,49 @@ describe.only('.transform', () => {
         }
       }
     })
+  })
+
+  describe('called with other operations', () => {
+    const ops: Operation[] = [
+      {
+        type: 'set_node',
+        path: operandPath,
+        properties: { id: 'operand' },
+        newProperties: { id: 'operand', key: 'modified' },
+      },
+      {
+        type: 'set_selection',
+        properties: null,
+        newProperties: {
+          anchor: { path: operandPath, offset: 0 },
+          focus: { path: operandPath, offset: 4 },
+        },
+      },
+      {
+        type: 'insert_text',
+        path: operandPath,
+        offset: 2,
+        text: 'inserted',
+      },
+      {
+        type: 'remove_text',
+        path: operandPath,
+        offset: 2,
+        text: 'removed',
+      },
+    ]
+
+    for (const op of ops) {
+      it(`${op.type} no-ops gracefully without mutating inputs`, () => {
+        const opCopy = structuredClone(op)
+        for (const [node, path] of Node.nodes(root)) {
+          const pathCopy = path.slice()
+          const newPath = Path.transform(path, op)
+          assert.deepEqual(path, pathCopy, `mutates op for ${node.id}`)
+          assert.deepEqual(op, opCopy, `mutates op for ${node.id}`)
+          assert.equal(newPath, path, `returned different ref for ${node.id}`)
+        }
+      })
+    }
   })
 })
