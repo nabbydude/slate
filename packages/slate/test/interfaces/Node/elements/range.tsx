@@ -1,6 +1,6 @@
 /** @jsx jsx  */
 import { Node } from 'slate'
-import { jsx } from 'slate-hyperscript'
+import { jsx } from '../../..'
 
 // TODO: this test is nonsensical, seemingly testing an API that doesn't exist
 // please put a proper test here, then remove this line
