@@ -207,21 +207,14 @@ export const Path: PathInterface = {
   },
 
   common(path: Path, another: Path): Path {
-    const min = Math.min(path.length, another.length)
-    const common: number[] = []
+    const commonDepth = Path.commonDepth(path, another)
 
-    for (let i = 0; i < min; i++) {
-      const av = path[i]
-      const bv = another[i]
+    // PERF: Avoid unnecessary array allocations.
+    if (commonDepth === 0) return Path.ROOT
+    if (commonDepth === path.length) return path
+    if (commonDepth === another.length) return another
 
-      if (av !== bv) {
-        break
-      }
-
-      common.push(av)
-    }
-
-    return common
+    return path.slice(0, commonDepth)
   },
 
   commonDepth(path: Path, another: Path): number {
