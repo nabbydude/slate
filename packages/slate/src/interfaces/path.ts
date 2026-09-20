@@ -218,6 +218,8 @@ export const Path: PathInterface = {
   },
 
   commonDepth(path: Path, another: Path): number {
+    if (path === another) return path.length
+
     const min = Math.min(path.length, another.length)
     let i = 0
     while (i < min && path[i] === another[i]) i++
@@ -226,6 +228,8 @@ export const Path: PathInterface = {
   },
 
   compare(path: Path, another: Path): -1 | 0 | 1 {
+    if (path === another) return 0
+
     const min = Math.min(path.length, another.length)
 
     for (let i = 0; i < min; i++) {
@@ -252,7 +256,8 @@ export const Path: PathInterface = {
 
   equals(path: Path, another: Path): boolean {
     return (
-      path.length === another.length && path.every((n, i) => n === another[i])
+      path === another ||
+      (path.length === another.length && path.every((n, i) => n === another[i]))
     )
   },
 
@@ -380,6 +385,7 @@ export const Path: PathInterface = {
   },
 
   relative(path: Path, ancestor: Path): Path {
+    if (ancestor.length === 0) return path
     if (!Path.isCommon(ancestor, path)) {
       throw new Error(
         `Cannot get the relative path of [${path}] inside ancestor [${ancestor}], because it is not above or equal to the path.`
