@@ -1,5 +1,12 @@
 # slate
 
+## 0.147.0
+
+### Patch Changes
+
+- [`2edbb00`](https://github.com/ianstormtaylor/slate/commit/2edbb0055be8c88d1888647bc6900cf2749e82d0) Thanks [@nabbydude](https://github.com/nabbydude)! - Created `TransformsInterface`, it is the type of the `Transforms` object.
+  Also API docs are auto-generated from code and JSDoc comments now!
+
 ## 0.146.0
 
 ### Minor Changes
